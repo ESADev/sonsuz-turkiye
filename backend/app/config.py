@@ -11,7 +11,7 @@ class Settings(BaseSettings):
     gemini_api_key: str | None = None
     gemini_model: str = "gemini-2.0-flash-lite"
     gemini_endpoint: str = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
-    moderation_model: str = "gemini-1.5-flash"
+    moderation_model: str = "gemini-2.0-flash-lite"
     gemini_timeout_seconds: int = 20
     rate_limit_per_session: int = 60
     rate_limit_reset_hours: int = 24

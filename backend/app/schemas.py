@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import List, Optional
+from typing import List
 
 from pydantic import BaseModel, Field
 
@@ -45,7 +45,7 @@ class CombineRequest(BaseModel):
 class GeminiElementResponse(BaseModel):
     name_tr: str
     emoji: str
-    description_tr: str
+    description_tr: str = ""
     tags: List[str] = Field(default_factory=list)
 
 

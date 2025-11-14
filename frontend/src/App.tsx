@@ -13,6 +13,7 @@ import './App.css';
 const PIN_STORAGE_KEY = 'sonsuz-turkiye-pinned';
 const THEME_STORAGE_KEY = 'sonsuz-turkiye-theme';
 const CANVAS_LIMIT = 24;
+const VANISH_ANIMATION_MS = 320;
 
 const AudioContextClass =
   typeof window !== 'undefined'
@@ -84,14 +85,21 @@ export default function App() {
 
   const combineMutation = useMutation({
     mutationFn: (
-      params: { sourceId: number; targetId: number; anchorUid: string; spawnAt: { x: number; y: number } }
+      params: {
+        sourceId: number;
+        targetId: number;
+        anchorUid: string;
+        targetUid: string;
+        spawnAt: { x: number; y: number };
+      }
     ) =>
       combineElements(sessionId!, params.sourceId, params.targetId, safetyOverride).then((response) => ({
         response,
         anchorUid: params.anchorUid,
+        targetUid: params.targetUid,
         spawnAt: params.spawnAt
       })),
-    onSuccess: ({ response, anchorUid, spawnAt }) => {
+    onSuccess: ({ response, anchorUid, targetUid, spawnAt }) => {
       if (response.rateLimitReached) {
         setToast('Bugün çok üretken çıktın! Biraz dinlen, sonra devam edelim.');
         return;
@@ -110,6 +118,7 @@ export default function App() {
         firstEver: response.isFirstEverCombination
       });
       markElementAsNotNew(anchorUid);
+      vanishCanvasElements([anchorUid, targetUid]);
       playPopSound();
 
       if (response.isFirstEverCombination) {
@@ -167,6 +176,20 @@ export default function App() {
     setCanvasElements((prev) => prev.map((item) => (item.uid === uid ? { ...item, isNew: false } : item)));
   };
 
+  const vanishCanvasElements = (uids: string[]) => {
+    if (!uids.length) return;
+    setCanvasElements((prev) =>
+      prev.map((item) => (uids.includes(item.uid) ? { ...item, isVanishing: true } : item))
+    );
+    if (selectedUid && uids.includes(selectedUid)) {
+      setSelectedUid(null);
+      setSelectionElementId(null);
+    }
+    window.setTimeout(() => {
+      setCanvasElements((prev) => prev.filter((item) => !uids.includes(item.uid)));
+    }, VANISH_ANIMATION_MS);
+  };
+
   const containerWidthRef = useRef<number>(0);
   const containerHeightRef = useRef<number>(0);
 
@@ -190,7 +213,7 @@ export default function App() {
 
   const handleMoveElement = (uid: string, position: { x: number; y: number }) => {
     setCanvasElements((prev) =>
-      prev.map((item) => (item.uid === uid ? { ...item, x: position.x, y: position.y } : item))
+      prev.map((item) => (item.uid === uid && !item.isVanishing ? { ...item, x: position.x, y: position.y } : item))
     );
   };
 
@@ -211,12 +234,16 @@ export default function App() {
   };
 
   const requestCombination = (source: CanvasElement, target: CanvasElement) => {
+    if (source.isVanishing || target.isVanishing) {
+      return;
+    }
     const centerX = target.x + 80;
     const centerY = target.y + 60;
     combineMutation.mutate({
       sourceId: source.elementId,
       targetId: target.elementId,
       anchorUid: source.uid,
+      targetUid: target.uid,
       spawnAt: { x: centerX, y: centerY }
     });
   };

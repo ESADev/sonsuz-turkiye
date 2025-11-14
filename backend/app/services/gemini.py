@@ -51,10 +51,10 @@ async def call_gemini(element_a: Element, element_b: Element, *, allow_unsafe: b
         raise GeminiError("No text in Gemini response")
 
     try:
-        parsed = GeminiElementResponse.model_validate_json(text)
-    except Exception as exc:  # noqa: BLE001
-        logger.warning("Failed to parse Gemini JSON: %s", exc)
-        raise GeminiError("Invalid JSON from Gemini") from exc
+        parsed = _parse_candidate_response(text)
+    except ValueError as exc:
+        logger.warning("Failed to parse Gemini response: %s", exc)
+        raise GeminiError("Invalid Gemini response format") from exc
 
     parsed.tags = safety.sanitize_tags(parsed.tags)
     return parsed
@@ -73,6 +73,23 @@ def _extract_text_from_response(data: dict) -> Optional[str]:
         return None
     except Exception:  # noqa: BLE001
         return None
+
+
+def _parse_candidate_response(raw_text: str) -> GeminiElementResponse:
+    """Convert the raw Gemini text output into a structured candidate."""
+    if not raw_text:
+        raise ValueError("Empty response")
+    cleaned_lines = [line.strip() for line in raw_text.splitlines() if line.strip()]
+    if not cleaned_lines:
+        raise ValueError("No usable content in response")
+    first_line = cleaned_lines[0]
+    if len(first_line) < 2:
+        raise ValueError("Response too short for emoji+name")
+    emoji = first_line[0]
+    name = first_line[1:].strip()
+    if not name:
+        raise ValueError("Missing name after emoji")
+    return GeminiElementResponse(name_tr=name, emoji=emoji)
 
 
 async def moderate_with_gemini(candidate: GeminiElementResponse) -> bool:
@@ -115,20 +132,22 @@ async def moderate_with_gemini(candidate: GeminiElementResponse) -> bool:
 
 def _build_prompt(element_a: Element, element_b: Element) -> str:
     example_lines = "\n".join(
-        f"Örnek: {a} + {b} -> {c}" for a, b, c in EXAMPLE_COMBINATIONS
+        f"Örnekler: {a} + {b} -> {c}" for a, b, c in EXAMPLE_COMBINATIONS
     )
     return (
         "Sonsuz Türkiye adlı crafting oyununda iki elementi birleştiriyorsun.\n"
         "Aşağıdaki iki elementten yeni bir Türkçe element üret.\n"
-        "Türk kültürü, interneti ve gündelik hayatı önceliklendir.\n"
-        "Sadece JSON çıktısı ver.\n\n"
-        f"Element A: \"{element_a.name_tr}\"\n"
+        "Türk kültürü, interneti ve gündelik hayatını önceliklendir.\n"
+        "Yalnızca tek satır döndür. İlk karakter bir emoji olmalı.\n"
+        "Emoji ile isim arasına boşluk koyma; ikinci karakterden itibaren ismi yaz.\n"
+        "JSON veya ekstra açıklama verme.\n\n"
+        f"Element A: \"{element_a.name_tr}\" (emoji: {element_a.emoji or 'yok'})\n"
         f"Açıklama: \"{element_a.description_tr or ''}\"\n\n"
-        f"Element B: \"{element_b.name_tr}\"\n"
+        f"Element B: \"{element_b.name_tr}\" (emoji: {element_b.emoji or 'yok'})\n"
         f"Açıklama: \"{element_b.description_tr or ''}\"\n\n"
-        "Yanıt formatı:\n"
-        "{\n  \"name_tr\": \"...\",\n  \"emoji\": \"...\",\n  \"description_tr\": \"...\",\n  \"tags\": [\"...\"]\n}\n\n"
-        + example_lines
+        + example_lines +
+        "\nBeklenen format:\n"
+        "🔥Anadolu Ateşi\n"
     )
 
 

@@ -23,6 +23,7 @@ export interface CanvasElement {
   discoveredAt: number;
   isNew?: boolean;
   isFirstEver?: boolean;
+  isVanishing?: boolean;
 }
 
 export interface CombineResponse {

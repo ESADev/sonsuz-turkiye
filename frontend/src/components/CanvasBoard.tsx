@@ -123,9 +123,15 @@ export function CanvasBoard({
           className={
             'canvas-item' +
             (element.uid === selectedUid ? ' canvas-item--selected' : '') +
-            (element.isNew ? ' canvas-item--new' : '')
+            (element.isNew && !element.isVanishing ? ' canvas-item--new' : '') +
+            (element.isVanishing ? ' canvas-item--vanish' : '')
           }
-          style={{ transform: `translate(${element.x}px, ${element.y}px)` }}
+          style={
+            {
+              '--translate-x': `${element.x}px`,
+              '--translate-y': `${element.y}px`
+            } as React.CSSProperties
+          }
           onPointerDown={(event) => handlePointerDown(event, element.uid)}
           onPointerMove={(event) => handlePointerMove(event, element.uid)}
           onPointerUp={(event) => handlePointerUp(event, element.uid)}
