@@ -1,0 +1,59 @@
+:root {
+  color-scheme: light;
+  --background: #f4f5f7;
+  --surface: #ffffff;
+  --surface-muted: #f1f1f1;
+  --text: #1a1a1a;
+  --text-muted: #5b5b5b;
+  --accent: #e30a17;
+  --accent-soft: rgba(227, 10, 23, 0.16);
+}
+
+[data-theme='dark'] {
+  color-scheme: dark;
+  --background: #111217;
+  --surface: #1b1c22;
+  --surface-muted: #24252d;
+  --text: #f8f9fb;
+  --text-muted: #b0b2c0;
+  --accent: #ff3b3f;
+  --accent-soft: rgba(255, 59, 63, 0.16);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: 'Inter', 'Segoe UI', system-ui, sans-serif;
+  background: var(--background);
+  color: var(--text);
+  min-height: 100vh;
+}
+
+button {
+  font-family: inherit;
+  cursor: pointer;
+}
+
+input {
+  font-family: inherit;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+.tooltip {
+  position: absolute;
+  background: var(--surface);
+  color: var(--text);
+  border-radius: 12px;
+  padding: 0.65rem 0.9rem;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.12);
+  max-width: 240px;
+  font-size: 0.9rem;
+  pointer-events: none;
+  z-index: 1000;
+}

@@ -1,0 +1,15 @@
+# Node
+frontend/node_modules
+frontend/dist
+frontend/tsconfig.node.tsbuildinfo
+frontend/vite.config.d.ts
+
+# Python
+__pycache__/
+*.pyc
+backend/sonsuz_turkiye.db
+backend/.env
+
+# Misc
+.DS_Store
+.env
