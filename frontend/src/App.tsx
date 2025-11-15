@@ -24,11 +24,6 @@ export default function App() {
       setError(null);
       const data = await fetchElements();
       setElements(data);
-      if (canvasElements.length === 0) {
-        data.filter((el) => el.is_seed).forEach((seed, index) => {
-          spawnOnCanvas(seed, 80 + index * 120, 120 + index * 40);
-        });
-      }
     } catch (err) {
       setError('Elementler yüklenemedi.');
       console.error(err);
@@ -50,27 +45,11 @@ export default function App() {
     ]);
   }
 
-  function handleDropFromSidebar(elementId: number, position: { x: number; y: number }) {
-    const element = elements.find((item) => item.id === elementId);
-    if (!element) return;
-    const clamped = clampPosition(position, boardRef.current.width, boardRef.current.height);
-    spawnOnCanvas(element, clamped.x, clamped.y);
-  }
-
   function handleMoveElement(uid: string, position: { x: number; y: number }) {
     const clamped = clampPosition(position, boardRef.current.width, boardRef.current.height);
     setCanvasElements((prev) =>
       prev.map((item) => (item.uid === uid ? { ...item, x: clamped.x, y: clamped.y } : item))
     );
-  }
-
-  function handleSelect(uid: string) {
-    if (selectedUid && selectedUid !== uid) {
-      requestCombine(selectedUid, uid);
-      setSelectedUid(null);
-      return;
-    }
-    setSelectedUid((current) => (current === uid ? null : uid));
   }
 
   async function requestCombine(sourceUid: string, targetUid: string) {
@@ -97,13 +76,6 @@ export default function App() {
     boardRef.current = size;
   }
 
-  function spawnFromSidebar(elementId: number) {
-    const element = elements.find((item) => item.id === elementId);
-    if (!element) return;
-    const center = { x: boardRef.current.width / 2 - 70, y: boardRef.current.height / 2 - 70 };
-    spawnOnCanvas(element, center.x, center.y);
-  }
-
   return (
     <div className="app">
       <header className="app__header">
@@ -114,13 +86,11 @@ export default function App() {
         <CanvasBoard
           elements={canvasElements}
           selectedUid={selectedUid}
-          onSelect={handleSelect}
-          onDropFromSidebar={handleDropFromSidebar}
           onMoveElement={handleMoveElement}
           onCombineRequest={requestCombine}
           onSizeChange={handleBoardSizeChange}
         />
-        <Sidebar elements={elements} onSpawn={spawnFromSidebar} />
+        <Sidebar elements={elements} />
       </main>
       {error && (
         <div className="app__error" role="status">

@@ -7,7 +7,7 @@ type SidebarProps = {
   onSpawn: (elementId: number) => void;
 };
 
-export function Sidebar({ elements, onSpawn }: SidebarProps) {
+export function Sidebar({ elements}: SidebarProps) {
   const seeds = elements.filter((element) => element.is_seed);
   const discoveries = elements.filter((element) => !element.is_seed);
 
@@ -21,14 +21,14 @@ export function Sidebar({ elements, onSpawn }: SidebarProps) {
       <section>
         <h2>Başlangıç</h2>
         {seeds.map((element) => (
-          <SidebarRow key={element.id} element={element} onSpawn={onSpawn} onDragStart={handleDragStart} />
+          <SidebarRow key={element.id} element={element} onDragStart={handleDragStart} />
         ))}
       </section>
       <section>
         <h2>Keşifler</h2>
         {discoveries.length === 0 && <p className="sidebar__empty">Henüz keşif yok.</p>}
         {discoveries.map((element) => (
-          <SidebarRow key={element.id} element={element} onSpawn={onSpawn} onDragStart={handleDragStart} />
+          <SidebarRow key={element.id} element={element} onDragStart={handleDragStart} />
         ))}
       </section>
     </aside>
@@ -41,19 +41,15 @@ type SidebarRowProps = {
   onDragStart: (event: DragEvent<HTMLDivElement>, elementId: number) => void;
 };
 
-function SidebarRow({ element, onSpawn, onDragStart }: SidebarRowProps) {
+function SidebarRow({ element, onDragStart }: SidebarRowProps) {
   return (
     <div
       className="sidebar-row"
       draggable
       onDragStart={(event) => onDragStart(event, element.id)}
-      onDoubleClick={() => onSpawn(element.id)}
     >
       <span className="sidebar-row__emoji">{element.emoji}</span>
       <span className="sidebar-row__name">{element.name_tr}</span>
-      <button type="button" onClick={() => onSpawn(element.id)}>
-        Yerleştir
-      </button>
     </div>
   );
 }
