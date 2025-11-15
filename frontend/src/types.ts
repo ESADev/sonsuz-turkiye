@@ -5,15 +5,6 @@ export interface ElementSummary {
   is_seed: boolean;
 }
 
-export interface CanvasElement {
-  uid: string;
-  elementId: number;
-  name: string;
-  emoji: string;
-  x: number;
-  y: number;
-}
-
 export interface CombineResponse {
   element: ElementSummary;
   created: boolean;
