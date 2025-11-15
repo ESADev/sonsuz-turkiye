@@ -1,9 +1,6 @@
 from __future__ import annotations
 
-import json
 import logging
-from datetime import datetime
-from pathlib import Path
 from typing import Optional
 
 import httpx
@@ -12,8 +9,6 @@ from ..config import get_settings
 from ..models import Element
 from ..schemas import GeminiElementResponse
 from .examples import EXAMPLE_COMBINATIONS
-
-DEBUG_LOG = Path(__file__).parent.parent.parent.parent / "gemini_debug.txt"
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -42,23 +37,14 @@ async def call_gemini(element_a: Element, element_b: Element) -> GeminiElementRe
         ]
     }
 
-    with open(DEBUG_LOG, "a", encoding="utf-8") as f:
-        f.write(f"\n{'='*80}\n[{datetime.utcnow()}] REQUEST: {element_a.name_tr} + {element_b.name_tr}\n{'='*80}\n")
-        f.write(f"{prompt}\n")
-
     async with httpx.AsyncClient(timeout=settings.gemini_timeout_seconds) as client:
         response = await client.post(endpoint, params=params, headers=headers, json=payload)
         if response.status_code >= 400:
-            with open(DEBUG_LOG, "a", encoding="utf-8") as f:
-                f.write(f"\n[{datetime.utcnow()}] ERROR: {response.status_code}\n{response.text}\n")
             logger.error("Gemini API error %s: %s", response.status_code, response.text)
             raise GeminiError(response.text)
         data = response.json()
 
     text = _extract_text_from_response(data)
-
-    with open(DEBUG_LOG, "a", encoding="utf-8") as f:
-        f.write(f"\n[{datetime.utcnow()}] RESPONSE:\n{json.dumps(data, indent=2, ensure_ascii=False)}\n")
     if not text:
         raise GeminiError("No text in Gemini response")
 
@@ -105,7 +91,8 @@ def _parse_candidate_response(raw_text: str) -> GeminiElementResponse:
 
 def build_prompt(element_a: Element, element_b: Element) -> str:
     example_lines = "\n".join(
-        "Örnekler:\n").join(f"{a}+{b}->{c}" for a, b, c in EXAMPLE_COMBINATIONS)
+        f"{a} + {b} -> {c}" for a, b, c in EXAMPLE_COMBINATIONS
+    )
 
     return (
         "Görevin türk internet ve genel kültürünü temel alan kelime üretme oyununda mantıklı, tutarlı ve mümkün olduğunda komik üretimler yapmak.\n"
@@ -113,8 +100,9 @@ def build_prompt(element_a: Element, element_b: Element) -> str:
         "Yalnızca tek satır oluştur: bir emoji ve hemen ardından element ismi.\n"
         "En az 1, en fazla 3 kelimelik elementler üret.\n"
         "Bazı güzel girdi ve çıktı örnekleri. Bunları taklit etme, kreatif davran. Özgün ol. Komik üret.\n"
+        "Örnekler:\n"
         f"{example_lines}\n\n"
         "Şimdi bunlardan yeni bir element üret:\n"
-        f"{element_a.emoji or 'ð'} (\"{element_a.name_tr}\")+"
-        f"{element_b.emoji or 'ð'} (\"{element_b.name_tr}\")->"
+        f"{(element_a.emoji or '❓')} (\"{element_a.name_tr}\") + "
+        f"{(element_b.emoji or '❓')} (\"{element_b.name_tr}\") ->"
     )

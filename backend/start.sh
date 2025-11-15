@@ -1,10 +1,10 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
-# Navigate to the backend directory
-cd /home/esadev/Repositories/sonsuz-turkiye/backend
+set -euo pipefail
 
-# Activate the virtual environment
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$SCRIPT_DIR"
+
 source venv/bin/activate
 
-# Start the backend server
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8049
