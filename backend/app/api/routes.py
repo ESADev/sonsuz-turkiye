@@ -14,7 +14,7 @@ router = APIRouter()
 @router.get("/elements", response_model=ElementsResponse)
 def get_elements(q: str | None = None) -> ElementsResponse:
     with get_session() as db:
-        query = select(Element).order_by(Element.is_seed.desc(), Element.created_at)
+        query = select(Element).order_by(Element.is_seed.desc(), Element.id)
         elements = db.exec(query).all()
         if q:
             lowered = q.casefold()
