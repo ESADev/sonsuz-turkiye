@@ -1,23 +1,32 @@
-import { useEffect, useRef, useState } from 'react';
-import { CanvasBoard } from './components/CanvasBoard';
+import { useEffect, useMemo, useState } from 'react';
 import { Sidebar } from './components/Sidebar';
 import { combineElements, fetchElements } from './lib/api';
-import type { CanvasElement, ElementSummary } from './types';
+import type { ElementSummary } from './types';
 import './App.css';
 
-let elementCounter = 0;
+type Slot = 'first' | 'second';
 
 export default function App() {
   const [elements, setElements] = useState<ElementSummary[]>([]);
-  const [canvasElements, setCanvasElements] = useState<CanvasElement[]>([]);
-  const [selectedUid, setSelectedUid] = useState<string | null>(null);
+  const [activeSlot, setActiveSlot] = useState<Slot>('first');
+  const [firstElementId, setFirstElementId] = useState<number | null>(null);
+  const [secondElementId, setSecondElementId] = useState<number | null>(null);
+  const [resultElement, setResultElement] = useState<ElementSummary | null>(null);
+  const [isCombining, setIsCombining] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const boardRef = useRef<{ width: number; height: number }>({ width: 800, height: 600 });
 
   useEffect(() => {
     void loadElements();
   }, []);
 
+  const firstElement = useMemo(
+    () => elements.find((item) => item.id === firstElementId) ?? null,
+    [elements, firstElementId]
+  );
+  const secondElement = useMemo(
+    () => elements.find((item) => item.id === secondElementId) ?? null,
+    [elements, secondElementId]
+  );
 
   async function loadElements() {
     try {
@@ -30,81 +39,153 @@ export default function App() {
     }
   }
 
-  function spawnOnCanvas(element: ElementSummary, x: number, y: number) {
-    const uid = `canvas-${elementCounter++}`;
-    setCanvasElements((prev) => [
-      ...prev,
-      {
-        uid,
-        elementId: element.id,
-        name: element.name_tr,
-        emoji: element.emoji,
-        x,
-        y
-      }
-    ]);
+  function handleSelectElement(element: ElementSummary) {
+    setError(null);
+    if (activeSlot === 'first') {
+      setFirstElementId(element.id);
+      setActiveSlot('second');
+    } else {
+      setSecondElementId(element.id);
+      setActiveSlot('first');
+    }
   }
 
-  function handleMoveElement(uid: string, position: { x: number; y: number }) {
-    const clamped = clampPosition(position, boardRef.current.width, boardRef.current.height);
-    setCanvasElements((prev) =>
-      prev.map((item) => (item.uid === uid ? { ...item, x: clamped.x, y: clamped.y } : item))
-    );
+  function handleFocusSlot(slot: Slot) {
+    setActiveSlot(slot);
   }
 
-  async function requestCombine(sourceUid: string, targetUid: string) {
-    const source = canvasElements.find((item) => item.uid === sourceUid);
-    const target = canvasElements.find((item) => item.uid === targetUid);
-    if (!source || !target) return;
+  async function handleCreate() {
+    if (!firstElementId || !secondElementId) {
+      setError('Lütfen iki element seçin.');
+      return;
+    }
+    setIsCombining(true);
+    setError(null);
+    setResultElement(null);
     try {
-      setError(null);
-      const response = await combineElements(source.elementId, target.elementId);
+      const response = await combineElements(firstElementId, secondElementId);
       setElements((prev) => {
         const exists = prev.some((item) => item.id === response.element.id);
         return exists ? prev : [...prev, response.element];
       });
-      const spawn = clampPosition({ x: target.x + 40, y: target.y + 40 }, boardRef.current.width, boardRef.current.height);
-      spawnOnCanvas(response.element, spawn.x, spawn.y);
-      setCanvasElements((prev) => prev.filter((item) => item.uid !== sourceUid && item.uid !== targetUid));
+      setResultElement(response.element);
     } catch (err) {
-      setError('Kombinasyon yapılamadı.');
       console.error(err);
+      setError('Oluşturma başarısız oldu.');
+    } finally {
+      setIsCombining(false);
     }
   }
 
-  function handleBoardSizeChange(size: { width: number; height: number }) {
-    boardRef.current = size;
-  }
+  const selectedIds = [firstElementId, secondElementId].filter(
+    (value): value is number => value !== null
+  );
+
+  const seeds = elements.filter((element) => element.is_seed);
+  const discoveries = elements.filter((element) => !element.is_seed);
 
   return (
     <div className="app">
-      <header className="app__header">
-        <h1>Sonsuz Türkiye</h1>
-        <p>Türk kültürünü harmanlayan basit bir element birleştirme oyunu.</p>
-      </header>
-      <main className="app__body">
-        <CanvasBoard
-          elements={canvasElements}
-          selectedUid={selectedUid}
-          onMoveElement={handleMoveElement}
-          onCombineRequest={requestCombine}
-          onSizeChange={handleBoardSizeChange}
-        />
-        <Sidebar elements={elements} />
+      <Sidebar
+        seeds={seeds}
+        discoveries={discoveries}
+        onSelect={handleSelectElement}
+        selectedIds={selectedIds}
+        activeSlot={activeSlot}
+      />
+      <main className="app__main">
+        <header className="app__header">
+          <div>
+            <h1>Sonsuz Türkiye</h1>
+            <p>İki elementi seç, “Create!” de ve keşfet.</p>
+          </div>
+          <button
+            type="button"
+            className="create-button"
+            onClick={handleCreate}
+            disabled={
+              isCombining || firstElementId === null || secondElementId === null
+            }
+          >
+            Create!
+          </button>
+        </header>
+        <section className="creation-area" aria-live="polite">
+          <ElementSlot
+            label="1. Element"
+            element={firstElement}
+            isActive={activeSlot === 'first'}
+            onClick={() => handleFocusSlot('first')}
+          />
+          <span className="creation-area__operator">+</span>
+          <ElementSlot
+            label="2. Element"
+            element={secondElement}
+            isActive={activeSlot === 'second'}
+            onClick={() => handleFocusSlot('second')}
+          />
+          <span className="creation-area__operator">=</span>
+          <ResultSlot isLoading={isCombining} element={resultElement} />
+        </section>
+        {error && (
+          <div className="app__error" role="status">
+            {error}
+          </div>
+        )}
       </main>
-      {error && (
-        <div className="app__error" role="status">
-          {error}
-        </div>
-      )}
     </div>
   );
 }
 
-function clampPosition(position: { x: number; y: number }, width: number, height: number) {
-  const margin = 32;
-  return {
-    x: Math.min(Math.max(position.x, margin), Math.max(width - margin, margin)),
-    y: Math.min(Math.max(position.y, margin), Math.max(height - margin, margin))
-  };
+type ElementSlotProps = {
+  label: string;
+  element: ElementSummary | null;
+  isActive: boolean;
+  onClick: () => void;
+};
+
+function ElementSlot({ label, element, isActive, onClick }: ElementSlotProps) {
+  return (
+    <button
+      type="button"
+      className={isActive ? 'element-slot element-slot--active' : 'element-slot'}
+      onClick={onClick}
+    >
+      <span className="element-slot__label">{label}</span>
+      {element ? (
+        <span className="element-slot__content">
+          <span className="element-slot__emoji">{element.emoji}</span>
+          <span className="element-slot__name">{element.name_tr}</span>
+        </span>
+      ) : (
+        <span className="element-slot__placeholder">Element seç</span>
+      )}
+    </button>
+  );
+}
+
+type ResultSlotProps = {
+  isLoading: boolean;
+  element: ElementSummary | null;
+};
+
+function ResultSlot({ isLoading, element }: ResultSlotProps) {
+  return (
+    <div className="result-slot">
+      <span className="element-slot__label">Sonuç</span>
+      {isLoading ? (
+        <div className="result-slot__loading">
+          <span className="spinner" aria-hidden="true" />
+          <span>Oluşturuluyor...</span>
+        </div>
+      ) : element ? (
+        <span className="element-slot__content">
+          <span className="element-slot__emoji">{element.emoji}</span>
+          <span className="element-slot__name">{element.name_tr}</span>
+        </span>
+      ) : (
+        <span className="element-slot__placeholder">Sonuç burada görünecek</span>
+      )}
+    </div>
+  );
 }
