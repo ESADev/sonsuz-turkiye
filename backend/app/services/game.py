@@ -62,10 +62,13 @@ async def combine_elements(session_id: str, element_a_id: int, element_b_id: int
                     rateLimitReached=True,
                 )
 
+                        
             candidate = await _generate_element(element_a, element_b, allow_unsafe=allow_unsafe)
             safe = safety.ensure_safe_element(candidate.name_tr, candidate.description_tr, allow_unsafe)
-            if safe:
+            # Only call model moderation if globally enabled and not explicitly overridden
+            if safe and settings.moderation_enabled and not allow_unsafe:
                 safe = await gemini.moderate_with_gemini(candidate)
+            
 
             if not safe:
                 was_safe = False

@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import json
 import logging
+from datetime import datetime
+from pathlib import Path
 from typing import Optional
 
 import httpx
@@ -11,6 +13,8 @@ from ..models import Element
 from ..schemas import GeminiElementResponse
 from . import safety
 from .examples import EXAMPLE_COMBINATIONS
+
+DEBUG_LOG = Path(__file__).parent.parent.parent.parent / "gemini_debug.txt"
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -39,14 +43,23 @@ async def call_gemini(element_a: Element, element_b: Element, *, allow_unsafe: b
         ]
     }
 
+    with open(DEBUG_LOG, "a", encoding="utf-8") as f:
+        f.write(f"\n{'='*80}\n[{datetime.utcnow()}] REQUEST: {element_a.name_tr} + {element_b.name_tr}\n{'='*80}\n")
+        f.write(f"{prompt}\n")
+
     async with httpx.AsyncClient(timeout=settings.gemini_timeout_seconds) as client:
         response = await client.post(endpoint, params=params, headers=headers, json=payload)
         if response.status_code >= 400:
+            with open(DEBUG_LOG, "a", encoding="utf-8") as f:
+                f.write(f"\n[{datetime.utcnow()}] ERROR: {response.status_code}\n{response.text}\n")
             logger.error("Gemini API error %s: %s", response.status_code, response.text)
             raise GeminiError(response.text)
         data = response.json()
 
     text = _extract_text_from_response(data)
+    
+    with open(DEBUG_LOG, "a", encoding="utf-8") as f:
+        f.write(f"\n[{datetime.utcnow()}] RESPONSE:\n{json.dumps(data, indent=2, ensure_ascii=False)}\n")
     if not text:
         raise GeminiError("No text in Gemini response")
 
@@ -56,7 +69,8 @@ async def call_gemini(element_a: Element, element_b: Element, *, allow_unsafe: b
         logger.warning("Failed to parse Gemini response: %s", exc)
         raise GeminiError("Invalid Gemini response format") from exc
 
-    parsed.tags = safety.sanitize_tags(parsed.tags)
+    # Respect global moderation switch for tag sanitization
+    parsed.tags = parsed.tags if not settings.moderation_enabled else safety.sanitize_tags(parsed.tags)
     return parsed
 
 
@@ -93,6 +107,9 @@ def _parse_candidate_response(raw_text: str) -> GeminiElementResponse:
 
 
 async def moderate_with_gemini(candidate: GeminiElementResponse) -> bool:
+    # Global master switch: when disabled, always consider content safe
+    if not settings.moderation_enabled:
+        return True
     if not settings.gemini_api_key:
         return True
     endpoint = settings.gemini_endpoint.format(model=settings.moderation_model)
@@ -123,39 +140,37 @@ async def moderate_with_gemini(candidate: GeminiElementResponse) -> bool:
             logger.warning("Moderation request failed: %s", response.text)
             return False
         data = response.json()
+
+    # Debug the raw moderation response to see what's coming back
+    logger.debug("Moderation response: %s", json.dumps(data, ensure_ascii=False))
+
     text = _extract_text_from_response(data)
     if not text:
         return False
-    normalized = text.strip().lower()
-    return "unsafe" not in normalized
+
+    normalized = text.strip().lower().strip(" '\"[].,;:!?\n\r\t")
+    # Only accept an explicit 'safe'; treat everything else as unsafe
+    return normalized == "safe"
 
 
 def _build_prompt(element_a: Element, element_b: Element) -> str:
     example_lines = "\n".join(
-        f"Örnekler: {a} + {b} -> {c}" for a, b, c in EXAMPLE_COMBINATIONS
-    )
+        "Örnekler:\n").join(f"{a}+{b}->{c}" for a, b, c in EXAMPLE_COMBINATIONS)
+    
     return (
-        "Sonsuz Türkiye adlı crafting oyununda iki elementi birleştiriyorsun.\n"
-        "Aşağıdaki iki elementten yeni bir Türkçe element üret.\n"
-        "Türk kültürü, interneti ve gündelik hayatını önceliklendir.\n"
-        "Yalnızca tek satır döndür. İlk karakter bir emoji olmalı.\n"
-        "Emoji ile isim arasına boşluk koyma; ikinci karakterden itibaren ismi yaz.\n"
-        "JSON veya ekstra açıklama verme.\n\n"
-        f"Element A: \"{element_a.name_tr}\" (emoji: {element_a.emoji or 'yok'})\n"
-        f"Açıklama: \"{element_a.description_tr or ''}\"\n\n"
-        f"Element B: \"{element_b.name_tr}\" (emoji: {element_b.emoji or 'yok'})\n"
-        f"Açıklama: \"{element_b.description_tr or ''}\"\n\n"
-        + example_lines +
-        "\nBeklenen format:\n"
-        "🔥Anadolu Ateşi\n"
+        "Görevin türk internet ve genel kültürünü temel alan kelime üretme oyununda mantıklı, tutarlı ve mümkün olduğunda komik üretimler yapmak.\n"
+        "Sana verilen iki elementten yeni bir element üreteceksin.\n"
+        "Yalnızca tek satır oluştur: bir emoji ve hemen ardından element ismi.\n"
+        "En az 1, en fazla 3 kelimelik elementler üret.\n"
+        "Bazı güzel girdi ve çıktı örnekleri. Bunları taklit etme, kreatif davran. Özgün ol. Komik üret.\n"
+        f"{example_lines}\n\n"
+        "Şimdi bunlardan yeni bir element üret:\n"
+        f"{element_a.emoji or 'ð'} (\"{element_a.name_tr}\")+"
+        f"{element_b.emoji or 'ð'} (\"{element_b.name_tr}\")->"
     )
 
 
 def simulate_element(element_a: Element, element_b: Element) -> GeminiElementResponse:
     name = f"{element_a.name_tr.split()[0]} {element_b.name_tr.split()[0]} Harmanı"
     emoji = element_a.emoji or element_b.emoji or "✨"
-    description = (
-        f"{element_a.name_tr} ile {element_b.name_tr} birleşince ortaya çıkan keyifli bir Türk harmanı."
-    )
-    tags = safety.sanitize_tags(["simülasyon", "yerel", element_a.name_tr, element_b.name_tr])
-    return GeminiElementResponse(name_tr=name[:40], emoji=emoji, description_tr=description[:140], tags=tags)
+    return GeminiElementResponse(name_tr=name[:40], emoji=emoji)

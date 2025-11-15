@@ -12,6 +12,8 @@ class Settings(BaseSettings):
     gemini_model: str = "gemini-2.0-flash-lite"
     gemini_endpoint: str = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
     moderation_model: str = "gemini-2.0-flash-lite"
+    # Master switch to enable/disable all content moderation and safety filters
+    moderation_enabled: bool = True
     gemini_timeout_seconds: int = 20
     rate_limit_per_session: int = 60
     rate_limit_reset_hours: int = 24

@@ -12,6 +12,9 @@ BLOCKLIST_REGEX = re.compile(r"|".join(re.escape(term) for term in settings.safe
 
 
 def is_safe_text(text: str, allow_unsafe: bool = False) -> bool:
+    # Global master switch disables all moderation when False
+    if not settings.moderation_enabled:
+        return True
     if allow_unsafe:
         return True
     if not text:
@@ -24,6 +27,14 @@ def ensure_safe_element(name: str, description: str, allow_unsafe: bool = False)
 
 
 def sanitize_tags(tags: Iterable[str]) -> list[str]:
+    # When moderation is globally disabled, keep tags as-is (only trim length)
+    if not settings.moderation_enabled:
+        sanitized_simple: list[str] = []
+        for tag in tags:
+            cleaned = tag.strip()
+            if cleaned:
+                sanitized_simple.append(cleaned[:30])
+        return sanitized_simple
     sanitized: list[str] = []
     for tag in tags:
         cleaned = tag.strip()

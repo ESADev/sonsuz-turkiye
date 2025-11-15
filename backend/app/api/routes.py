@@ -28,7 +28,9 @@ router = APIRouter()
 @router.post("/session", response_model=SessionCreateResponse)
 def create_session(payload: SessionCreateRequest | None = None):
     with get_session() as db:
-        session = Session(safety_override=payload.safetyOverride if payload else False)
+        default_override = True # desired default
+        safety = payload.safetyOverride if (payload and payload.safetyOverride is not None) else default_override
+        session = Session(safety_override=safety)
         db.add(session)
         db.commit()
         db.refresh(session)

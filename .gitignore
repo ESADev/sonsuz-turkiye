@@ -13,3 +13,6 @@ backend/.env
 # Misc
 .DS_Store
 .env
+
+# Linux
+backend/.venvbackend/gemini_debug.txt

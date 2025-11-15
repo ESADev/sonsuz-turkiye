@@ -45,8 +45,6 @@ class CombineRequest(BaseModel):
 class GeminiElementResponse(BaseModel):
     name_tr: str
     emoji: str
-    description_tr: str = ""
-    tags: List[str] = Field(default_factory=list)
 
 
 class CombineResult(BaseModel):
