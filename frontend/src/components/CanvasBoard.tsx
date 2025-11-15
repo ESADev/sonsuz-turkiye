@@ -1,160 +1,120 @@
-import type React from 'react';
-import { useCallback, useRef, useState } from 'react';
+import { useEffect, useRef } from 'react';
+import type { DragEvent, PointerEvent } from 'react';
 import type { CanvasElement } from '../types';
 import './CanvasBoard.css';
 
 type CanvasBoardProps = {
   elements: CanvasElement[];
   selectedUid: string | null;
-  onSelect: (uid: string, elementId: number) => void;
-  onClearSelection: () => void;
+  onSelect: (uid: string) => void;
   onDropFromSidebar: (elementId: number, position: { x: number; y: number }) => void;
   onMoveElement: (uid: string, position: { x: number; y: number }) => void;
   onCombineRequest: (sourceUid: string, targetUid: string) => void;
+  onSizeChange: (size: { width: number; height: number }) => void;
 };
 
 export function CanvasBoard({
   elements,
   selectedUid,
   onSelect,
-  onClearSelection,
   onDropFromSidebar,
   onMoveElement,
-  onCombineRequest
+  onCombineRequest,
+  onSizeChange
 }: CanvasBoardProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
-  const pointerState = useRef<{
-    uid: string | null;
-    offsetX: number;
-    offsetY: number;
-  }>({ uid: null, offsetX: 0, offsetY: 0 });
+  const dragState = useRef<{ uid: string | null; offsetX: number; offsetY: number }>({
+    uid: null,
+    offsetX: 0,
+    offsetY: 0
+  });
   const elementRefs = useRef(new Map<string, HTMLDivElement>());
-  const [tooltip, setTooltip] = useState<{ x: number; y: number; text: string } | null>(null);
 
-  const setElementRef = useCallback((uid: string, node: HTMLDivElement | null) => {
-    if (node) {
-      elementRefs.current.set(uid, node);
+  useEffect(() => {
+    const node = containerRef.current;
+    if (!node) return;
+    const observer = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        const box = entry.contentRect;
+        onSizeChange({ width: box.width, height: box.height });
+      }
+    });
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [onSizeChange]);
+
+  const setElementRef = (uid: string, element: HTMLDivElement | null) => {
+    if (element) {
+      elementRefs.current.set(uid, element);
     } else {
       elementRefs.current.delete(uid);
     }
-  }, []);
+  };
 
-  const handleDragOver = (event: React.DragEvent<HTMLDivElement>) => {
+  const handleDrop = (event: DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    const raw = event.dataTransfer.getData('application/x-element-id');
+    if (!raw || !containerRef.current) return;
+    const elementId = Number(raw);
+    const rect = containerRef.current.getBoundingClientRect();
+    const position = { x: event.clientX - rect.left, y: event.clientY - rect.top };
+    onDropFromSidebar(elementId, position);
+  };
+
+  const handleDragOver = (event: DragEvent<HTMLDivElement>) => {
     event.preventDefault();
   };
 
-  const handleDrop = (event: React.DragEvent<HTMLDivElement>) => {
-    event.preventDefault();
-    const rawId = event.dataTransfer.getData('application/x-element-id');
-    if (!rawId) return;
-    const elementId = Number(rawId);
-    const rect = containerRef.current?.getBoundingClientRect();
-    if (!rect) return;
-    const x = event.clientX - rect.left;
-    const y = event.clientY - rect.top;
-    onDropFromSidebar(elementId, { x, y });
-  };
-
-  const handlePointerDown = (event: React.PointerEvent<HTMLDivElement>, uid: string) => {
-    event.preventDefault();
-    const node = elementRefs.current.get(uid);
-    if (!node || !containerRef.current) return;
-    node.setPointerCapture(event.pointerId);
-    const rect = node.getBoundingClientRect();
-    pointerState.current = {
+  const handlePointerDown = (event: PointerEvent<HTMLDivElement>, uid: string) => {
+    const element = elementRefs.current.get(uid);
+    if (!element || !containerRef.current) return;
+    element.setPointerCapture(event.pointerId);
+    const rect = element.getBoundingClientRect();
+    dragState.current = {
       uid,
       offsetX: event.clientX - rect.left,
       offsetY: event.clientY - rect.top
     };
   };
 
-  const handlePointerMove = (event: React.PointerEvent<HTMLDivElement>, uid: string) => {
-    if (pointerState.current.uid !== uid || !containerRef.current) return;
-    event.preventDefault();
+  const handlePointerMove = (event: PointerEvent<HTMLDivElement>, uid: string) => {
+    if (dragState.current.uid !== uid || !containerRef.current) return;
     const rect = containerRef.current.getBoundingClientRect();
-    const nextX = event.clientX - rect.left - pointerState.current.offsetX;
-    const nextY = event.clientY - rect.top - pointerState.current.offsetY;
-    onMoveElement(uid, { x: nextX, y: nextY });
+    onMoveElement(uid, {
+      x: event.clientX - rect.left - dragState.current.offsetX,
+      y: event.clientY - rect.top - dragState.current.offsetY
+    });
   };
 
-  const handlePointerUp = (event: React.PointerEvent<HTMLDivElement>, uid: string) => {
-    event.preventDefault();
-    const node = elementRefs.current.get(uid);
-    if (node) {
-      node.releasePointerCapture(event.pointerId);
+  const handlePointerUp = (event: PointerEvent<HTMLDivElement>, uid: string) => {
+    const element = elementRefs.current.get(uid);
+    if (element) {
+      element.releasePointerCapture(event.pointerId);
     }
-    if (!containerRef.current) return;
-    const droppedOn = findTargetUid(uid, event.clientX, event.clientY, elementRefs.current);
-    if (droppedOn && droppedOn !== uid) {
-      onCombineRequest(uid, droppedOn);
+    const target = findTargetUid(uid, event.clientX, event.clientY, elementRefs.current);
+    if (target) {
+      onCombineRequest(uid, target);
     }
-    pointerState.current = { uid: null, offsetX: 0, offsetY: 0 };
+    dragState.current = { uid: null, offsetX: 0, offsetY: 0 };
   };
-
-  const handleMouseEnter = (event: React.MouseEvent<HTMLDivElement>, description?: string) => {
-    if (!description) return;
-    setTooltip({ x: event.clientX, y: event.clientY, text: description });
-  };
-
-  const handleMouseMove = (event: React.MouseEvent<HTMLDivElement>, description?: string) => {
-    if (!description || !tooltip) return;
-    setTooltip({ x: event.clientX, y: event.clientY, text: description });
-  };
-
-  const handleMouseLeave = () => setTooltip(null);
 
   return (
-    <div
-      className="canvas"
-      ref={containerRef}
-      onDragOver={handleDragOver}
-      onDrop={handleDrop}
-      onClick={(event) => {
-        if (event.target === containerRef.current) {
-          onClearSelection();
-        }
-      }}
-    >
-      <div className="canvas__grid" aria-hidden />
+    <div ref={containerRef} className="canvas" onDrop={handleDrop} onDragOver={handleDragOver}>
       {elements.map((element) => (
         <div
           key={element.uid}
           ref={(node) => setElementRef(element.uid, node)}
-          className={
-            'canvas-item' +
-            (element.uid === selectedUid ? ' canvas-item--selected' : '') +
-            (element.isNew && !element.isVanishing ? ' canvas-item--new' : '') +
-            (element.isVanishing ? ' canvas-item--vanish' : '')
-          }
-          style={
-            {
-              '--translate-x': `${element.x}px`,
-              '--translate-y': `${element.y}px`
-            } as React.CSSProperties
-          }
+          className={element.uid === selectedUid ? 'canvas-item canvas-item--selected' : 'canvas-item'}
+          style={{ transform: `translate(${element.x}px, ${element.y}px)` }}
           onPointerDown={(event) => handlePointerDown(event, element.uid)}
           onPointerMove={(event) => handlePointerMove(event, element.uid)}
           onPointerUp={(event) => handlePointerUp(event, element.uid)}
-          onClick={(event) => {
-            event.stopPropagation();
-            onSelect(element.uid, element.elementId);
-          }}
-          onMouseEnter={(event) => handleMouseEnter(event, element.description)}
-          onMouseMove={(event) => handleMouseMove(event, element.description)}
-          onMouseLeave={handleMouseLeave}
+          onClick={() => onSelect(element.uid)}
         >
           <span className="canvas-item__emoji">{element.emoji}</span>
           <span className="canvas-item__name">{element.name}</span>
-          {element.isNew && (
-            <span className="canvas-item__badge">{element.isFirstEver ? 'İlk Keşif!' : 'Yeni!'}</span>
-          )}
         </div>
       ))}
-      {tooltip && (
-        <div className="tooltip" style={{ left: tooltip.x + 12, top: tooltip.y + 12 }}>
-          {tooltip.text}
-        </div>
-      )}
     </div>
   );
 }
@@ -165,9 +125,9 @@ function findTargetUid(
   clientY: number,
   refs: Map<string, HTMLDivElement>
 ): string | null {
-  for (const [uid, node] of refs.entries()) {
+  for (const [uid, element] of refs.entries()) {
     if (uid === sourceUid) continue;
-    const rect = node.getBoundingClientRect();
+    const rect = element.getBoundingClientRect();
     if (clientX >= rect.left && clientX <= rect.right && clientY >= rect.top && clientY <= rect.bottom) {
       return uid;
     }

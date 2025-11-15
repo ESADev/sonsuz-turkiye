@@ -1,43 +1,26 @@
-import axios from 'axios';
 import type { CombineResponse, ElementSummary } from '../types';
 
-const client = axios.create({
-  baseURL: import.meta.env.VITE_API_URL ?? 'http://localhost:8000'
-});
+const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:8000';
 
-export interface SessionPayload {
-  safetyOverride?: boolean;
+export async function fetchElements(search?: string): Promise<ElementSummary[]> {
+  const params = search ? `?q=${encodeURIComponent(search)}` : '';
+  const response = await fetch(`${API_URL}/api/elements${params}`);
+  if (!response.ok) {
+    throw new Error('Failed to fetch elements');
+  }
+  const data = (await response.json()) as { elements: ElementSummary[] };
+  return data.elements;
 }
 
-export async function createSession(payload?: SessionPayload) {
-  const response = await client.post('/api/session', payload ?? {});
-  return response.data as { sessionId: string; discoveredElementIds: number[] };
-}
-
-export async function fetchElements(sessionId: string, search?: string) {
-  const response = await client.get('/api/elements', {
-    params: { sessionId, q: search }
+export async function combineElements(elementAId: number, elementBId: number): Promise<CombineResponse> {
+  const response = await fetch(`${API_URL}/api/combine`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ elementAId, elementBId })
   });
-  return response.data.elements as ElementSummary[];
-}
-
-export async function combineElements(
-  sessionId: string,
-  elementAId: number,
-  elementBId: number,
-  allowUnsafe?: boolean
-) {
-  const response = await client.post('/api/combine', {
-    sessionId,
-    elementAId,
-    elementBId,
-    allowUnsafe: allowUnsafe ?? false
-  });
-  return response.data as CombineResponse;
-}
-
-export async function updateSession(sessionId: string, safetyOverride: boolean) {
-  await client.patch(`/api/session/${sessionId}`, {
-    safetyOverride
-  });
+  if (!response.ok) {
+    const message = await response.text();
+    throw new Error(message || 'Failed to combine elements');
+  }
+  return (await response.json()) as CombineResponse;
 }
