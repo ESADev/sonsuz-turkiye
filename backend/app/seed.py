@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from sqlmodel import select
 
 from .database import get_session
@@ -7,26 +5,10 @@ from .models import Element
 from .services.game import normalize_name
 
 SEED_ELEMENTS = [
-    {
-        "name_tr": "Su",
-        "emoji": "💧",
-        "description_tr": "Hayatın kaynağı olan berrak Türk suları.",
-    },
-    {
-        "name_tr": "Ateş",
-        "emoji": "🔥",
-        "description_tr": "Mangaldan tandıra uzanan sıcaklık.",
-    },
-    {
-        "name_tr": "Toprak",
-        "emoji": "🌱",
-        "description_tr": "Anadolu'nun bereketli toprağı.",
-    },
-    {
-        "name_tr": "Hava",
-        "emoji": "💨",
-        "description_tr": "Boğazdan esen serin rüzgar.",
-    },
+    {"name_tr": "Su", "emoji": "💧"},
+    {"name_tr": "Ateş", "emoji": "🔥"},
+    {"name_tr": "Toprak", "emoji": "🌱"},
+    {"name_tr": "Hava", "emoji": "💨"},
 ]
 
 
@@ -46,8 +28,6 @@ def seed_base_elements() -> None:
                 name_tr=item["name_tr"],
                 normalized_name=normalized,
                 emoji=item["emoji"],
-                description_tr=item["description_tr"],
-                tags=["tohum"],
                 is_seed=True,
             )
             session.add(element)
