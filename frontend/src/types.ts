@@ -1,7 +1,6 @@
 export interface ElementSummary {
-  id: number;
-  name_tr: string;
   emoji: string;
+  name: string;
   is_seed: boolean;
 }
 

@@ -3,6 +3,8 @@ from __future__ import annotations
 import logging
 from typing import Optional
 
+from google import genai
+
 import httpx
 
 from ..config import get_settings
@@ -20,36 +22,26 @@ class GeminiError(Exception):
 
 async def call_gemini(element_a: Element, element_b: Element) -> GeminiElementResponse:
     if not settings.gemini_api_key:
-        raise GeminiError("Gemini API anahtarı tanımlı değil")
+        raise GeminiError("Gemini API key is absent!")
 
-    endpoint = settings.gemini_endpoint.format(model=settings.gemini_model)
-    headers = {"Content-Type": "application/json"}
-    params = {"key": settings.gemini_api_key}
+    client = genai.Client()  # Automatically picks up API key from environment
+    
     prompt = build_prompt(element_a, element_b)
-    payload = {
-        "contents": [
-            {
-                "role": "user",
-                "parts": [
-                    {"text": prompt},
-                ],
-            }
-        ]
-    }
+    response = client.models.generate_content(
+        model=settings.gemini_model,
+        contents=prompt
+    )
 
-    async with httpx.AsyncClient(timeout=settings.gemini_timeout_seconds) as client:
-        response = await client.post(endpoint, params=params, headers=headers, json=payload)
-        if response.status_code >= 400:
-            logger.error("Gemini API error %s: %s", response.status_code, response.text)
-            raise GeminiError(response.text)
-        data = response.json()
+    logger.debug("Received Gemini response: %s", response)
 
-    text = _extract_text_from_response(data)
+    text = _extract_text_from_response(response)
+    logger.debug("Extracted text from Gemini response: %s", text)
     if not text:
         raise GeminiError("No text in Gemini response")
 
     try:
         parsed = _parse_candidate_response(text)
+        logger.debug("Parsed Gemini response: %s", parsed)
     except ValueError as exc:
         logger.warning("Failed to parse Gemini response: %s", exc)
         raise GeminiError("Invalid Gemini response format") from exc

@@ -9,8 +9,8 @@ type Slot = 'first' | 'second';
 export default function App() {
   const [elements, setElements] = useState<ElementSummary[]>([]);
   const [activeSlot, setActiveSlot] = useState<Slot>('first');
-  const [firstElementId, setFirstElementId] = useState<number | null>(null);
-  const [secondElementId, setSecondElementId] = useState<number | null>(null);
+  const [firstElementId, setFirstElementId] = useState<string | null>(null);
+  const [secondElementId, setSecondElementId] = useState<string | null>(null);
   const [resultElement, setResultElement] = useState<ElementSummary | null>(null);
   const [isCombining, setIsCombining] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -20,11 +20,15 @@ export default function App() {
   }, []);
 
   const firstElement = useMemo(
-    () => elements.find((item) => item.id === firstElementId) ?? null,
+    () =>
+      elements.find((item) => String(item.name) === String(firstElementId)) ??
+      null,
     [elements, firstElementId]
   );
   const secondElement = useMemo(
-    () => elements.find((item) => item.id === secondElementId) ?? null,
+    () =>
+      elements.find((item) => String(item.name) === String(secondElementId)) ??
+      null,
     [elements, secondElementId]
   );
 
@@ -42,10 +46,10 @@ export default function App() {
   function handleSelectElement(element: ElementSummary) {
     setError(null);
     if (activeSlot === 'first') {
-      setFirstElementId(element.id);
+      setFirstElementId(element.name);
       setActiveSlot('second');
     } else {
-      setSecondElementId(element.id);
+      setSecondElementId(element.name);
       setActiveSlot('first');
     }
   }
@@ -155,7 +159,7 @@ function ElementSlot({ label, element, isActive, onClick }: ElementSlotProps) {
       {element ? (
         <span className="element-slot__content">
           <span className="element-slot__emoji">{element.emoji}</span>
-          <span className="element-slot__name">{element.name_tr}</span>
+          <span className="element-slot__name">{element.name}</span>
         </span>
       ) : (
         <span className="element-slot__placeholder">Element seç</span>
@@ -181,7 +185,7 @@ function ResultSlot({ isLoading, element }: ResultSlotProps) {
       ) : element ? (
         <span className="element-slot__content">
           <span className="element-slot__emoji">{element.emoji}</span>
-          <span className="element-slot__name">{element.name_tr}</span>
+          <span className="element-slot__name">{element.name}</span>
         </span>
       ) : (
         <span className="element-slot__placeholder">Sonuç burada görünecek</span>

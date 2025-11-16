@@ -15,12 +15,12 @@ class ElementsResponse(BaseModel):
 
 
 class CombineRequest(BaseModel):
-    elementAId: int
-    elementBId: int
+    elementA: str
+    elementB: str
 
 
 class GeminiElementResponse(BaseModel):
-    name_tr: str
+    name: str
     emoji: str
 
 

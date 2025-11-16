@@ -9,7 +9,7 @@ class Element(SQLModel, table=True):
     __tablename__ = "elements"
 
     id: Optional[int] = Field(default=None, primary_key=True)
-    name_tr: str = Field(index=True, unique=True)
+    name: str = Field(index=True, unique=True)
     normalized_name: str = Field(index=True, unique=True)
     emoji: str = Field(default="")
     is_seed: bool = Field(default=False, nullable=False)

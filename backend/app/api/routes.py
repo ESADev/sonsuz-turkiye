@@ -29,7 +29,7 @@ def get_elements(q: str | None = None) -> ElementsResponse:
 @router.post("/combine", response_model=CombineResponse)
 async def combine(payload: CombineRequest) -> CombineResponse:
     try:
-        return await game.combine_elements(payload.elementAId, payload.elementBId)
+        return await game.combine_elements(payload.elementA, payload.elementB)
     except ValueError as exc:  # noqa: BLE001
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 

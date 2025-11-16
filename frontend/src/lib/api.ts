@@ -12,11 +12,11 @@ export async function fetchElements(search?: string): Promise<ElementSummary[]> 
   return data.elements;
 }
 
-export async function combineElements(elementAId: number, elementBId: number): Promise<CombineResponse> {
+export async function combineElements(elementA: ElementSummary, elementB: ElementSummary): Promise<CombineResponse> {
   const response = await fetch(`${API_URL}/api/combine`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ elementAId, elementBId })
+    body: JSON.stringify({ elementA: elementA.emoji + elementA.name, elementB: elementB.emoji + elementB.name})
   });
   if (!response.ok) {
     const message = await response.text();
